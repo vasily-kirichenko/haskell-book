@@ -22,7 +22,7 @@ charPairs k s =
 ordPairs :: Keyword -> String -> [(Int, Int)]
 ordPairs k s = map ((\k -> ord k - ord 'A') *** ord) $ charPairs k s
 
---encode :: Keyword -> String -> String
+encode :: Keyword -> String -> String
 encode k s =
   let shifted =
         map
