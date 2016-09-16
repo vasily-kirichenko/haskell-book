@@ -4,7 +4,7 @@ import           Addition
 import           Chipher
 import           Morse
 import           Playground
-import           Semigroups
+import           SemigroupsAndMonoids
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"

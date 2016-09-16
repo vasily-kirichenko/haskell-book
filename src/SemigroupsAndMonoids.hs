@@ -1,18 +1,28 @@
-module Semigroups where
+module SemigroupsAndMonoids where
 
 import           Data.Semigroup
 import           Test.QuickCheck
+
+semigroupAssoc :: (Eq m, Semigroup m) => m -> m -> m -> Bool
+semigroupAssoc a b c = (a <> (b <> c)) == ((a <> b) <> c)
+
+monoidLeftIdentity :: (Eq m, Monoid m) => m -> Bool
+monoidLeftIdentity m = mempty `mappend` m == m
+monoidRightIdentity m = m `mappend` mempty == m
+
+-- Trivial
 
 data Trivial = Trivial deriving (Eq, Show)
 
 instance Semigroup Trivial where
   _ <> _ = Trivial
 
+instance Monoid Trivial where
+  mempty = Trivial
+  mappend = (<>)
+
 instance Arbitrary Trivial where
   arbitrary = return Trivial
-
-semigroupAssoc :: (Eq m, Semigroup m) => m -> m -> m -> Bool
-semigroupAssoc a b c = (a <> (b <> c)) == ((a <> b) <> c)
 
 type TrivialAssoc = Trivial -> Trivial -> Trivial -> Bool
 
@@ -22,6 +32,10 @@ newtype Identity a = Identity a deriving (Eq, Show)
 
 instance Semigroup a => Semigroup (Identity a) where
   (Identity x) <> (Identity y) = Identity $ x <> y
+
+instance (Semigroup a, Monoid a) => Monoid (Identity a) where
+  mempty = Identity mempty
+  mappend = (<>)
 
 instance (Arbitrary a, Semigroup a) => Arbitrary (Identity a) where
   arbitrary = do
@@ -36,6 +50,10 @@ data Two a b = Two a b deriving (Eq, Show)
 
 instance (Semigroup a, Semigroup b) => Semigroup (Two a b) where
   (Two x y) <> (Two x' y') = Two (x <> x') (y <> y')
+
+instance (Semigroup a, Monoid a, Semigroup b, Monoid b) => Monoid (Two a b) where
+  mempty = Two mempty mempty
+  mappend = (<>)
 
 instance (Arbitrary a, Arbitrary b, Semigroup a, Semigroup b) =>
   Arbitrary (Two a b) where
@@ -77,6 +95,10 @@ newtype BoolConj = BoolConj Bool deriving (Eq, Show)
 instance Semigroup BoolConj where
   (BoolConj x) <> (BoolConj y) = BoolConj (x && y)
 
+instance Monoid BoolConj where
+  mempty = BoolConj True
+  mappend = (<>)
+
 instance Arbitrary BoolConj where
   arbitrary = do
     a <- arbitrary
@@ -90,6 +112,10 @@ newtype BoolDisj = BoolDisj Bool deriving (Eq, Show)
 
 instance Semigroup BoolDisj where
   (BoolDisj x) <> (BoolDisj y) = BoolDisj (x || y)
+
+instance Monoid BoolDisj where
+  mempty = BoolDisj False
+  mappend = (<>)
 
 instance Arbitrary BoolDisj where
   arbitrary = do
@@ -125,12 +151,20 @@ instance Semigroup b => Semigroup (Combine a b) where
   (Combine f) <> (Combine g) =
     Combine $ \a -> f a <> g a
 
+instance (Semigroup b, Monoid b) => Monoid (Combine a b) where
+  mempty = Combine $ const mempty
+  mappend = (<>)
+
 -- Comp
 
 newtype Comp a = Comp { unComp :: a -> a }
 
 instance Semigroup (Comp a) where
   Comp f <> Comp g = Comp $ f. g
+
+instance (Semigroup a) => Monoid (Comp a) where
+  mempty = Comp id
+  mappend = (<>)
 
 -- Validation
 
@@ -180,14 +214,48 @@ type AccumulateBothAssoc a b =
   AccumulateBoth a b ->
   Bool
 
+-- Mem
+
+newtype Mem s a = Mem { runMem :: s -> (a, s) }
+
+instance (Semigroup a) => Semigroup (Mem s a) where
+  (Mem f) <> (Mem f') =
+    Mem $ \s ->
+      let (a, s') = f' s
+          (a', s'') = f s'
+      in (a <> a', s'')
+
+instance (Semigroup a, Monoid a) => Monoid (Mem s a) where
+  mempty = Mem $ \s -> (mempty, s)
+  mappend = (<>)
+
+
+f' = Mem $ \s -> ("hi", s + 1) -- ("hi", 1)
+
 main :: IO ()
 main = do
   quickCheck (semigroupAssoc :: TrivialAssoc)
+  quickCheck (monoidLeftIdentity :: Trivial -> Bool)
+  quickCheck (monoidRightIdentity :: Trivial -> Bool)
+
   quickCheck (semigroupAssoc :: IdentityAssoc [Int])
+  quickCheck (monoidLeftIdentity :: Identity [Int] -> Bool)
+  quickCheck (monoidRightIdentity :: Identity [Int] -> Bool)
+
   quickCheck (semigroupAssoc :: TwoAssoc [Int] [Double])
+  quickCheck (monoidLeftIdentity :: Two [Int] [Double] -> Bool)
+  quickCheck (monoidRightIdentity :: Two [Int] [Double] -> Bool)
+
   quickCheck (semigroupAssoc :: FourAssoc [Int] [Double] [String] [Int])
+
   quickCheck (semigroupAssoc :: BoolConjAssoc)
+  quickCheck (monoidLeftIdentity :: BoolConj -> Bool)
+  quickCheck (monoidRightIdentity :: BoolConj -> Bool)
+
   quickCheck (semigroupAssoc :: BoolDisjAssoc)
+  quickCheck (monoidLeftIdentity :: BoolDisj -> Bool)
+  quickCheck (monoidRightIdentity :: BoolDisj -> Bool)
+
   quickCheck (semigroupAssoc :: OrAssoc [Int] [Int])
   quickCheck (semigroupAssoc :: ValidationAssoc [String] [Int])
   quickCheck (semigroupAssoc :: AccumulateBothAssoc [String] [Int])
