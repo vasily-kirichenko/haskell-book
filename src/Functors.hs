@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Functors where
 
 import           Test.QuickCheck
@@ -106,6 +108,99 @@ instance (Arbitrary a, Arbitrary b) => Arbitrary (Four' a b) where
     a'' <- arbitrary
     b <- arbitrary
     return $ Four' a a' a'' b
+
+-- Possibly
+
+data Possibly a
+  = LolNone
+  | Yeppers a
+  deriving (Eq, Show)
+
+instance Functor Possibly where
+  fmap _ LolNone = LolNone
+  fmap f (Yeppers a) = Yeppers $ f a
+
+-- Sum
+
+data Sum a b
+  = First a
+  | Second b
+  deriving (Eq, Show)
+
+instance Functor (Sum a) where
+  fmap _ (First a) = First a
+  fmap f (Second b) = Second $ f b
+
+-- Company
+
+data Company a b c
+  = DeepBlue a c
+  | Something b
+  deriving (Eq, Show)
+
+instance Functor (Company e e') where
+  fmap f (DeepBlue a c) = DeepBlue a (f c)
+  fmap _ (Something b) = Something b
+
+-- More
+
+data More b a
+  = L a b a
+  | R b a b
+  deriving (Eq, Show)
+
+instance Functor (More a) where
+  fmap f (L a b a') = L (f a) b (f a')
+  fmap f (R b a b') = R b (f a) b'
+
+-- Quant
+
+data Quant a b
+  = Finance
+  | Desk a
+  | Bloor b
+
+instance Functor (Quant a) where
+  fmap _ Finance = Finance
+  fmap _ (Desk a) = Desk a
+  fmap f (Bloor b) = Bloor (f b)
+
+-- K
+
+data K a b = K a
+
+newtype Flip f a b = Flip (f b a) deriving (Eq, Show)
+
+instance Functor (Flip K a) where
+  fmap f (Flip (K b)) = Flip (K (f b))
+
+-- EvilGoateeConst
+
+data EvilGoateeConst a b = GoatyConst b
+
+instance Functor (EvilGoateeConst a) where
+  fmap f (GoatyConst b) = GoatyConst $ f b
+
+-- LiftIfOut
+
+data LiftItOut f a = LiftItOut (f a)
+
+instance Functor f => Functor (LiftItOut f) where
+  fmap g (LiftItOut fa) = LiftItOut $ fmap g fa
+
+-- Parappa
+
+data Parappa f g a = DaWrappa (f a) (g a)
+
+instance (Functor f, Functor g) => Functor (Parappa f g) where
+  fmap h (DaWrappa f g) = DaWrappa (fmap h f) (fmap h g)
+
+-- IgnoreOne
+
+data IgnoreOne f g a b = IgnoringSomething (f a) (g b)
+
+instance Functor g => Functor (IgnoreOne f g a) where
+  fmap h (IgnoringSomething f g) = IgnoringSomething f (fmap h g)
 
 main :: IO ()
 main = do
