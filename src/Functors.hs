@@ -202,6 +202,49 @@ data IgnoreOne f g a b = IgnoringSomething (f a) (g b)
 instance Functor g => Functor (IgnoreOne f g a) where
   fmap h (IgnoringSomething f g) = IgnoringSomething f (fmap h g)
 
+-- Notorious
+
+data Notorious g o a t = Notorious (g o) (g a) (g t)
+
+instance Functor g => Functor (Notorious g o a) where
+  fmap h (Notorious g g' g'') = Notorious g g' (fmap h g'')
+
+-- List
+
+data List a
+  = Nil
+  | Cons a (List a)
+  deriving Show
+
+instance Functor List where
+  fmap _ Nil = Nil
+  fmap f (Cons a l) = Cons (f a) (fmap f l)
+
+-- GoatLord
+
+data GoatLord a
+  = NoGoat
+  | OneGoat a
+  | MoreGoats (GoatLord a) (GoatLord a) (GoatLord a)
+  deriving Show
+
+instance Functor GoatLord where
+  fmap _ NoGoat = NoGoat
+  fmap f (OneGoat a) = OneGoat (f a)
+  fmap f (MoreGoats x y z) = MoreGoats (fmap f x) (fmap f y) (fmap f z)
+
+-- TalkToMe
+
+data TalkToMe a
+  = Halt
+  | Print String a
+  | Read (String -> a)
+
+instance Functor TalkToMe where
+  fmap _ Halt = Halt
+  fmap f (Print s a) = Print s $ f a
+  fmap f (Read sf) = Read $ f . sf
+
 main :: IO ()
 main = do
   quickCheck $ \x -> functorIdentity (x :: Identity Int)
