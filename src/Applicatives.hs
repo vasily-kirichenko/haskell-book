@@ -1,7 +1,11 @@
 module Applicatives where
 
 import           Control.Applicative
-import           Data.List           (elemIndex)
+import           Data.List                (elemIndex)
+import           Data.Monoid
+import           Test.QuickCheck
+import           Test.QuickCheck.Checkers
+import           Test.QuickCheck.Classes
 
 added :: Maybe Integer
 added = (+3) <$> lookup 3 (zip [1, 2, 3] [4, 5, 6])
@@ -47,3 +51,144 @@ instance Functor Identity where
 instance Applicative Identity where
   pure = Identity
   (Identity f) <*> (Identity a) = Identity $ f a
+
+newtype Constant a b = Constant { getConstant :: a } deriving Show
+
+instance Functor (Constant a) where
+  fmap _ (Constant a) = Constant a
+
+instance Monoid a => Applicative (Constant a) where
+  pure _ = Constant mempty
+  (Constant a) <*> (Constant b) = Constant $ a <> b
+
+validateLength :: Int -> String -> Maybe String
+validateLength maxLen s =
+  if length s > maxLen then Nothing else Just s
+
+newtype Name = Name String deriving (Eq, Show)
+newtype Address = Address String deriving (Eq, Show)
+
+mkName :: String -> Maybe Name
+mkName s = Name <$> validateLength 25 s
+
+mkAddress :: String -> Maybe Address
+mkAddress a = Address <$> validateLength 100 a
+
+data Person = Person Name Address deriving (Eq, Show)
+
+mkPerson :: String -> String -> Maybe Person
+mkPerson n a = Person <$> mkName n <*> mkAddress a
+
+xx = const <$> Just "Hello" <*> pure "World"
+yy =
+  (,,,)
+  <$> Just 90
+  <*> Just 10
+  <*> Just "Tierness"
+  <*> Just [1, 2, 3]
+
+-- Lows
+
+data Bull
+  = Fools
+  | Twoo
+  deriving (Eq, Show)
+
+instance Arbitrary Bull where
+  arbitrary =
+    frequency [ (1, return Fools)
+              , (1, return Twoo) ]
+
+instance Monoid Bull where
+  mempty = Fools
+  mappend _ _ = Fools
+
+instance EqProp Bull where (=-=) = eq
+
+-- ZipList
+
+instance Monoid a => Monoid (ZipList a) where
+  mempty = pure mempty
+  mappend = liftA2 mappend
+
+instance Arbitrary a => Arbitrary (ZipList a) where
+  arbitrary = ZipList <$> arbitrary
+
+instance Arbitrary a => Arbitrary (Sum a) where
+  arbitrary = Sum <$> arbitrary
+
+instance Eq a => EqProp (ZipList a) where (=-=) = eq
+
+-- List
+
+data List a
+  = Nil
+  | Cons a (List a)
+  deriving (Eq, Show)
+
+instance Functor List where
+  fmap _ Nil = Nil
+  fmap f (Cons a l) = Cons (f a) (fmap f l)
+
+append :: List a -> List a -> List a
+append Nil ys = ys
+append (Cons x xs) ys = Cons x $ xs `append` ys
+
+fold :: (a -> b -> b) -> b -> List a -> b
+fold _ b Nil = b
+fold f b (Cons h t) = f h (fold f b t)
+
+concat' :: List (List a) -> List a
+concat' = fold append Nil
+
+flatMap :: (a -> List b) -> List a -> List b
+flatMap f as = concat' (fmap f as)
+
+zip' :: List a -> List b -> List (a, b)
+zip' Nil _ = Nil
+zip' _ Nil = Nil
+zip' (Cons x xs) (Cons y ys) = Cons (x, y) (zip' xs ys)
+
+instance Applicative List where
+  pure a = Cons a Nil
+  Nil <*> _ = Nil
+  _ <*> Nil = Nil
+  (<*>) fs as = flatMap (`fmap` as) fs
+
+instance Arbitrary a => Arbitrary (List a) where
+  arbitrary = do
+    a <- arbitrary
+    elements [Nil, Cons a Nil]
+
+instance Eq a => EqProp (List a) where (=-=) = eq
+
+newtype ZipList' a = ZipList' (List a) deriving (Eq, Show)
+
+instance Functor ZipList' where
+  fmap f (ZipList' xs) = ZipList' $ fmap f xs
+
+instance Applicative ZipList' where
+  pure a = ZipList' $ Cons a Nil
+  ZipList' l <*> ZipList' l' =
+    ZipList' (fmap (\(f, x) -> f x) (zip' l l'))
+
+take' :: Int -> List a -> List a
+take' _ Nil = Nil
+take' 0 _ = Nil
+take' n (Cons x t) = Cons x (take' (n - 1) t)
+
+instance Eq a => EqProp (ZipList' a) where
+  xs =-= ys = xs' `eq` ys'
+    where xs' = let (ZipList' l) = xs in take' 3000 l
+          ys' = let (ZipList' l) = ys in take' 3000 l
+
+instance Arbitrary a => Arbitrary (ZipList' a) where
+  arbitrary = ZipList' <$> arbitrary
+
+main :: IO ()
+main = do
+  quickBatch $ monoid (ZipList [1 :: Sum Int])
+  quickBatch $ applicative (Cons (1 :: Int, 2 :: Int, 3 :: Int) Nil)
+
+  quickBatch $
+    applicative (ZipList' (Cons (1 :: Int, 2 :: Int, 3 :: Int) Nil))
