@@ -1,5 +1,6 @@
 module Monads where
 
+import           Control.Monad            (join)
 import           Data.Monoid              hiding (First, Second, Sum)
 import           Test.QuickCheck
 import           Test.QuickCheck.Checkers
@@ -92,9 +93,52 @@ instance Arbitrary a => Arbitrary (Identity a) where
 
 instance Eq a => EqProp (Identity a) where (=-=) = eq
 
+-- List
+
+data List a
+  = Nil
+  | Cons a (List a)
+  deriving (Eq, Show)
+
+instance Functor List where
+  fmap _ Nil = Nil
+  fmap f (Cons a l) = Cons (f a) (fmap f l)
+
+append :: List a -> List a -> List a
+append Nil ys = ys
+append (Cons x xs) ys = Cons x $ xs `append` ys
+
+fold :: (a -> b -> b) -> b -> List a -> b
+fold _ b Nil = b
+fold f b (Cons h t) = f h (fold f b t)
+
+concat' :: List (List a) -> List a
+concat' = fold append Nil
+
+flatMap :: (a -> List b) -> List a -> List b
+flatMap f as = concat' (fmap f as)
+
+instance Applicative List where
+  pure a = Cons a Nil
+  Nil <*> _ = Nil
+  _ <*> Nil = Nil
+  (<*>) fs as = flatMap (`fmap` as) fs
+
+instance Monad List where
+  Nil >>= _ = Nil
+  (Cons a l) >>= f = f a `append` (l >>= f)
+
+instance Arbitrary a => Arbitrary (List a) where
+  arbitrary = do
+    a <- arbitrary
+    elements [Nil, Cons a Nil]
+
+instance Eq a => EqProp (List a) where (=-=) = eq
+
 main :: IO ()
 main = do
   quickBatch $ monad (undefined :: Nope (Int, Int, Int))
   quickBatch $ monad (undefined :: PEither (Int, Int, Int)
                                            (Int, Int, Int))
   quickBatch $ monad (undefined :: Identity (Int, Int, Int))
+  quickBatch $ monad (undefined :: List (Int, Int, Int))
