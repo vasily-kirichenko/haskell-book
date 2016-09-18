@@ -185,6 +185,55 @@ instance Eq a => EqProp (ZipList' a) where
 instance Arbitrary a => Arbitrary (ZipList' a) where
   arbitrary = ZipList' <$> arbitrary
 
+-- Variations of Either
+
+data Sum' a b
+  = First' a
+  | Second' b
+  deriving (Eq, Show)
+
+data Validation e a
+  = Error' e
+  | Success' a
+  deriving (Eq, Show)
+
+instance Functor (Sum' a) where
+  fmap _ (First' a) = First' a
+  fmap f (Second' b) = Second' (f b)
+
+instance Applicative (Sum' a) where
+  pure = Second'
+  First' a <*> _ = First' a
+  _ <*> First' a = First' a
+  Second' f <*> Second' b = Second' $ f b
+
+instance (Eq a, Eq b) => EqProp (Sum' a b) where (=-=) = eq
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (Sum' a b) where
+  arbitrary = do
+    a <- arbitrary
+    b <- arbitrary
+    elements [First' a, Second' b]
+
+instance Functor (Validation e) where
+  fmap _ (Error' e) = Error' e
+  fmap f (Success' a) = Success' (f a)
+
+instance Monoid e => Applicative (Validation e) where
+  pure = Success'
+  Error' e <*> Error' e' = Error' $ e <> e'
+  Error' e <*> _ = Error' e
+  _ <*> Error' e = Error' e
+  Success' f <*> Success' a = Success' $ f a
+
+instance (Eq a, Eq b) => EqProp (Validation a b) where (=-=) = eq
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (Validation a b) where
+  arbitrary = do
+    a <- arbitrary
+    b <- arbitrary
+    elements [Error' a, Success' b]
+
 main :: IO ()
 main = do
   quickBatch $ monoid (ZipList [1 :: Sum Int])
@@ -192,3 +241,11 @@ main = do
 
   quickBatch $
     applicative (ZipList' (Cons (1 :: Int, 2 :: Int, 3 :: Int) Nil))
+
+  quickBatch $
+    applicative (First' (1, 2, 3) :: Sum' (Int, Int, Int) (Int, Int, Int))
+
+  quickBatch $
+    applicative (Error' ("a", "b", "c")
+                  :: Validation (String, String, String)
+                                (String, String, String))
