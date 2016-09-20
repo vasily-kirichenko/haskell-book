@@ -1,6 +1,7 @@
 module Monads where
 
 import           Control.Monad            (join)
+import           Control.Monad            (liftM2)
 import           Data.Monoid              hiding (First, Second, Sum)
 import           Test.QuickCheck
 import           Test.QuickCheck.Checkers
@@ -134,6 +135,36 @@ instance Arbitrary a => Arbitrary (List a) where
     elements [Nil, Cons a Nil]
 
 instance Eq a => EqProp (List a) where (=-=) = eq
+
+-- Final functions
+
+j :: Monad m => m (m a) -> m a
+j mm = mm >>= id
+
+l1 :: Monad m => (a -> b) -> m a -> m b
+l1 f ma = ma >>= (return . f)
+
+l2 :: Monad m => (a -> b -> c) -> m a -> m b -> m c
+l2 f ma mb =
+  ma >>= \a ->
+  mb >>= \b ->
+  return $ f a b
+
+a :: Monad m => m a -> m (a -> b) -> m b
+a m f =
+  m >>= \a ->
+  f >>= \f ->
+  return $ f a
+
+meh :: Monad m => [a] -> (a -> m b) -> m [b]
+meh [] _ = return []
+meh (x:xs) f = do
+  b <- f x
+  bs <- meh xs f
+  return $ b : bs
+
+flipType :: Monad m => [m a] -> m [a]
+flipType ms = meh ms id
 
 main :: IO ()
 main = do
