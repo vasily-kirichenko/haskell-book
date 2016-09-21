@@ -92,9 +92,75 @@ instance Arbitrary a => Arbitrary (List a) where
 
 instance Eq a => EqProp (List a) where (=-=) = eq
 
+-- Three
+
+data Three a b c = Three a b c deriving (Eq, Ord, Show)
+
+instance Functor (Three a b) where
+  fmap f (Three a b c) = Three a b $ f c
+
+instance Foldable (Three a b) where
+  foldr f s (Three _ _ c) = f c s
+
+instance Traversable (Three a b) where
+  traverse f (Three a b c) = Three a b <$> f c
+
+instance (Arbitrary a, Arbitrary b, Arbitrary c) =>
+  Arbitrary (Three a b c) where
+    arbitrary =
+      Three
+      <$> arbitrary
+      <*> arbitrary
+      <*> arbitrary
+
+instance (Eq a, Eq b, Eq c) => EqProp (Three a b c) where (=-=) = eq
+
+-- Three'
+
+data Three' a b = Three' a b b deriving (Eq, Ord, Show)
+
+instance Functor (Three' a) where
+  fmap f (Three' a b b') = Three' a (f b) (f b')
+
+instance Foldable (Three' a) where
+  foldr f s (Three' _ b b') = f b (f b' s)
+
+instance Traversable (Three' a) where
+  traverse f (Three' a b b') = Three' a <$> f b <*> f b'
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (Three' a b) where
+  arbitrary =
+    Three'
+    <$> arbitrary
+    <*> arbitrary
+    <*> arbitrary
+
+instance (Eq a, Eq b) => EqProp (Three' a b) where (=-=) = eq
+
+-- S
+
+data S n a = S (n a) a deriving (Eq, Ord, Show)
+
+instance Functor n => Functor (S n) where
+  fmap f (S n a) = S (fmap f n) (f a)
+
+instance Foldable n => Foldable (S n) where
+  foldr f s (S _ a) = f a s
+
+instance Traversable n => Traversable (S n) where
+  traverse f (S n a) = S <$> traverse f n <*> f a
+
+instance (Arbitrary a, Traversable n) => Arbitrary (S n a) where
+  arbitrary = do
+    a <- arbitrary
+    n <- arbitrary
+    return $ S n a
+
 main :: IO ()
 main = do
     quickBatch $ traversable (undefined :: Identity (Int, Int, [Int]))
     quickBatch $ traversable (undefined :: Constant String (Int, Int, [Int]))
     quickBatch $ traversable (undefined :: Optional (Int, Int, [Int]))
     quickBatch $ traversable (undefined :: List (Int, Int, [Int]))
+    quickBatch $ traversable (undefined :: Three Int Int (Int, Int, [Int]))
+    quickBatch $ traversable (undefined :: Three' Int (Int, Int, [Int]))
