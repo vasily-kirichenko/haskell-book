@@ -166,6 +166,15 @@ meh (x:xs) f = do
 flipType :: Monad m => [m a] -> m [a]
 flipType ms = meh ms id
 
+newtype F a b = F { function :: (a -> b) }
+
+instance Show (F a b) where
+  show (F _) = "F"
+
+instance Monoid b => Monoid (F a b) where
+  mempty = F $ const mempty
+  mappend (F f) (F g) = F $ \x -> f x `mappend` g x
+
 main :: IO ()
 main = do
   quickBatch $ monad (undefined :: Nope (Int, Int, Int))
