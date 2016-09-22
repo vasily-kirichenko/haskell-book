@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+
 module Traversables where
 
 import           Test.QuickCheck
@@ -145,16 +147,19 @@ instance Functor n => Functor (S n) where
   fmap f (S n a) = S (fmap f n) (f a)
 
 instance Foldable n => Foldable (S n) where
-  foldr f s (S _ a) = f a s
+  foldr f s (S n a) = foldr f (f a s) n
 
 instance Traversable n => Traversable (S n) where
   traverse f (S n a) = S <$> traverse f n <*> f a
 
-instance (Arbitrary a, Traversable n) => Arbitrary (S n a) where
+instance Arbitrary a => Arbitrary (S Maybe a) where
   arbitrary = do
     a <- arbitrary
-    n <- arbitrary
-    return $ S n a
+    a' <- arbitrary
+    oneof [ return $ S Nothing a
+          , return $ S (Just a') a ]
+
+instance Eq a => EqProp (S Maybe a) where (=-=) = eq
 
 main :: IO ()
 main = do
@@ -164,3 +169,5 @@ main = do
     quickBatch $ traversable (undefined :: List (Int, Int, [Int]))
     quickBatch $ traversable (undefined :: Three Int Int (Int, Int, [Int]))
     quickBatch $ traversable (undefined :: Three' Int (Int, Int, [Int]))
+    quickBatch $
+      traversable (undefined :: S Maybe (Int, Int, [Int]))
