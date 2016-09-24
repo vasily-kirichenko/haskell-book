@@ -4,6 +4,9 @@ import           Control.Applicative       (liftA3)
 import           Control.Monad             (replicateM)
 import           Control.Monad.Trans.State
 import           System.Random
+import           Test.QuickCheck
+import           Test.QuickCheck.Checkers
+import           Test.QuickCheck.Classes
 
 data Die
   = DieOne
@@ -79,3 +82,26 @@ rollsCountLogged n = go 0 (0, [])
       | otherwise =
           let (die, nextGen) = randomR (1, 6) gen
           in go (sum + die) (count + 1, intToDie die:dies) nextGen
+
+newtype Moi s a = Moi { runMoi :: s -> (a, s) }
+
+instance Functor (Moi s) where
+  fmap f (Moi g) =
+    Moi $ \s ->
+      let (a, s') = g s
+      in (f a, s')
+
+instance Applicative (Moi s) where
+  pure a = Moi $ \s -> (a, s)
+  (Moi f) <*> (Moi g) =
+    Moi $ \s ->
+      let (a, s') = g s
+          (ab, s'') = f s'
+      in (ab a, s'')
+
+instance Monad (Moi s) where
+  return = pure
+  (Moi f) >>= g =
+    Moi $ \s ->
+    let (a, s') = f s
+    in runMoi (g a) s'
