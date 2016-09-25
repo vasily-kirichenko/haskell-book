@@ -4,6 +4,7 @@ import           Addition
 import           Chipher
 import           HttpStuff
 import           Morse
+import           Parsers
 import           Playground
 import           SemigroupsAndMonoids
 

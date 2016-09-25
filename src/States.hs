@@ -7,7 +7,7 @@ get' :: State s s
 get' = get >>= \s -> put s *> return s
 
 put' :: s -> State s ()
-put' s = put s *> return ()
+put' s = void $ put s
 
 exec :: State s a -> s -> s
 exec sa s = snd (runState sa s)
