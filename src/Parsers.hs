@@ -54,7 +54,12 @@ parseFraction = do
   numerator <- decimal
   char '/'
   denominator <- decimal
-  return (numerator % denominator)
+  case denominator of
+    0 -> fail "Denominator cannot be zero"
+    _ -> return (numerator % denominator)
+
+myParse :: Parser Integer
+myParse = integer <* eof
 
 main :: IO ()
 main = do
