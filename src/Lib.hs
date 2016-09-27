@@ -3,8 +3,8 @@ module Lib where
 import           Addition
 import           Chipher
 import           HttpStuff
+import           Ini
 import           Morse
-import           Parsers
 import           Parsers
 import           Playground
 import           SemigroupsAndMonoids
