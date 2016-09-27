@@ -1,10 +1,13 @@
+{-# LANGUAGE DatatypeContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
 
 module Parsers where
 
 import           Control.Applicative
 import           Control.Monad       (forM_)
 import           Data.Ratio          ((%))
+import           Text.RawString.QQ
 import           Text.Trifecta
 
 stop :: Parser a
@@ -49,8 +52,8 @@ alsoBad = "10"
 shouldWork = "1/2"
 shouldAlsoWork = "2/1"
 
-parseFraction :: Parser Rational
-parseFraction = do
+parseRational :: Parser Rational
+parseRational = do
   numerator <- decimal
   char '/'
   denominator <- decimal
@@ -58,11 +61,51 @@ parseFraction = do
     0 -> fail "Denominator cannot be zero"
     _ -> return (numerator % denominator)
 
+parseFractional :: Fractional a => Parser a
+parseFractional = do
+  firstPart <- decimal
+  char '.'
+  secondPart <- decimal
+  let secondPartCount = numberCount secondPart
+  return $
+    fromInteger (firstPart * (10 ^ secondPartCount) + secondPart) /
+    (10 ^ secondPartCount)
+  where
+    numberCount = go 0
+    go count n =
+      case n `divMod` 10 of
+        (0, _) -> count + 1
+        (x, _) -> go (count + 1) x
+
+data Fractional a => RationalOrFractional a
+  = Rat Rational
+  | Frac a
+  deriving (Eq, Show)
+
+rationalOrFractional :: Fractional a => Parser (RationalOrFractional a)
+rationalOrFractional =
+  try (Rat <$> parseRational) <|> (Frac <$> parseFractional)
+
 myParse :: Parser Integer
 myParse = integer <* eof
 
+type NumberOrString = Either Integer String
+
+eitherOr :: String
+eitherOr = [r|
+123
+abc
+456
+def
+|]
+
+parseNos :: Parser NumberOrString
+parseNos =
+  skipMany (oneOf "\n")
+  >>
+      (Left <$> integer)
+  <|> (Right <$> some letter)
+
 main :: IO ()
-main = do
-  forM_
-    [shouldWork, shouldAlsoWork, alsoBad, badFraction]
-    (print . parseString parseFraction mempty)
+main =
+  print $ parseString (some (token parseNos)) mempty eitherOr

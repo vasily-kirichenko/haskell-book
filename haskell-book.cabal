@@ -31,6 +31,7 @@ library
                      , random
                      , dlist
                      , trifecta
+                     , raw-strings-qq
   default-language:    Haskell2010
   ghc-options:         -fwarn-incomplete-patterns
                        -fwarn-incomplete-uni-patterns
