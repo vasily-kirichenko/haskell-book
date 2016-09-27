@@ -1,4 +1,3 @@
-{-# LANGUAGE DatatypeContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 
@@ -77,7 +76,7 @@ parseFractional = do
         (0, _) -> count + 1
         (x, _) -> go (count + 1) x
 
-data Fractional a => RationalOrFractional a
+data RationalOrFractional a
   = Rat Rational
   | Frac a
   deriving (Eq, Show)
