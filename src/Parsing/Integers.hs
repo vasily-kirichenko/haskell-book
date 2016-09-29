@@ -15,3 +15,12 @@ base10Integer = do
       (\d (coeff, res) -> (coeff + 1, res + (10 ^ coeff) * d))
       (0, 0)
       digits
+
+base10Integer' :: Parser Integer
+base10Integer' = do
+  skipMany $ char '+'
+  minus <- optional $ char '-'
+  value <- base10Integer
+  return $ case minus of
+    Just _ -> -value
+    Nothing -> value
