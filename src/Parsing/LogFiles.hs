@@ -7,12 +7,14 @@ import           Control.Monad
 import           Data.Maybe          (fromMaybe)
 import           Data.Time           hiding (parseTime)
 import           Text.RawString.QQ
+
+import           Data.List
 import           Text.Trifecta
 
 data Log = Log [LogDay] deriving Eq
 data LogDay = LogDay Day [Activity] deriving Eq
-type Name = String
-data Activity = Activity TimeOfDay Name deriving Eq
+type ActivityName = String
+data Activity = Activity TimeOfDay ActivityName deriving Eq
 
 instance Show Activity where
   show (Activity time name) = show time ++ " " ++ name
@@ -35,16 +37,23 @@ parseTime = do
     Nothing -> fail "Wrong time"
     Just x -> return x
 
-eol :: Parser ()
-eol = void $ char '\n'
+skipEOL :: Parser ()
+skipEOL = skipMany $ char '\n'
+
+skipComment :: Parser ()
+skipComment = do
+  whiteSpace
+  _ <- char '-'
+  _ <- char '-'
+  skipMany (noneOf "\n")
+  skipEOL
 
 parseActivity :: Parser Activity
 parseActivity = do
   time <- parseTime
   whiteSpace
-  name <- some $ noneOf "\n"
-  skipMany $ noneOf "\n"
-  eol
+  name <- many (noneOf "\n") --`manyTill` (skipComment <|> skipEOL)
+  skipEOL
   return $ Activity time name
 
 parseDay :: Parser Day
@@ -56,8 +65,8 @@ parseDay = do
   month <- fromInteger <$> integer
   char '-'
   day <- fromInteger <$> integer
-  skipMany $ noneOf "\n"
-  eol
+  skipMany (noneOf "\n")
+  skipEOL
   return $ fromGregorian year month day
 
 parseLogDay :: Parser LogDay
@@ -65,6 +74,31 @@ parseLogDay = LogDay <$> parseDay <*> some parseActivity
 
 parseLog :: Parser Log
 parseLog = Log <$> many (whiteSpace *> parseLogDay)
+
+toMaybe :: Result a -> Maybe a
+toMaybe (Success a) = Just a
+toMaybe (Failure _) = Nothing
+
+timeByActivity :: Log -> [(ActivityName, DiffTime)]
+timeByActivity (Log days) =
+    let activities =
+          concatMap (\(LogDay _ activities) -> activities) days
+        groupped =
+          groupBy
+            (\(Activity _ n1) (Activity _ n2) -> n1 == n2)
+            activities
+        timeByName =
+          map
+            (\as ->
+              let (Activity _ name) = head as
+                  totalTime =
+                    sum .
+                    map (\(Activity t _) -> timeOfDayToTime t) $
+                    as
+              in (name, totalTime)
+            )
+            groupped
+    in timeByName
 
 logEx :: String
 logEx = [r|
