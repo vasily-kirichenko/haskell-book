@@ -1,5 +1,9 @@
 module Transformers where
 
+
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Identity
+
 newtype EitherT e m a = EitherT { runEitherT :: m (Either e a) }
 
 instance Functor m => Functor (EitherT e m) where
@@ -71,3 +75,48 @@ instance Monad m => Monad (StateT s m) where
       (a, s') <- sma s
       (b, s'') <- runStateT (f a) s'
       return (b, s'')
+
+newtype MaybeT m a = MaybeT { runMaybeT :: m (Maybe a) }
+
+instance Functor m => Functor (MaybeT m) where
+  fmap f (MaybeT ma) = MaybeT $ (fmap . fmap) f ma
+
+instance Applicative m => Applicative (MaybeT m) where
+  pure = MaybeT . pure . pure
+  MaybeT f <*> MaybeT a = MaybeT $ (<*>) <$> f <*> a
+
+instance Monad m => Monad (MaybeT m) where
+  return = pure
+  (MaybeT ma) >>= f =
+    MaybeT $ do
+      a <- ma
+      case a of
+        Just a -> runMaybeT (f a)
+        Nothing -> return Nothing
+
+instance MonadTrans MaybeT where
+  lift = MaybeT . fmap Just
+
+instance MonadTrans (ReaderT r) where
+  lift = ReaderT . const
+
+instance MonadTrans (EitherT e) where
+  lift = EitherT . fmap Right
+
+instance MonadTrans (StateT s) where
+  lift ma = StateT $ \s -> fmap (\a -> (a, s)) ma
+
+class Monad m => MonadIO m where
+  liftIO :: IO a -> m a
+
+instance MonadIO m => MonadIO (IdentityT m) where
+  liftIO = IdentityT . liftIO
+
+instance MonadIO m => MonadIO (MaybeT m) where
+  liftIO = lift . liftIO
+
+instance MonadIO m => MonadIO (ReaderT r m) where
+  liftIO = lift . liftIO
+
+instance MonadIO m => MonadIO (StateT s m) where
+  liftIO = lift . liftIO
