@@ -11,35 +11,54 @@ data Scores =
   , computer :: Int
   } deriving Show
 
-getComputerGuess :: Int -> StateT Scores IO Int
-getComputerGuess maxNumber = liftIO $ randomRIO (0, maxNumber)
+data GameState =
+  GameState {
+    scores           :: Scores
+  , allPlayerGuesses :: [Int]
+} deriving Show
+
+getComputerGuess :: Int -> StateT GameState IO Int
+getComputerGuess maxNumber = do
+  liftIO $ randomRIO (0, maxNumber)
+
+getComputerFingers :: IO Int
+getComputerFingers = randomRIO (0, 5)
 
 askPlayerForNumber :: String -> IO Int
 askPlayerForNumber caption =
   putStr (caption ++ ": ") >> readLn :: IO Int
 
-game :: StateT Scores IO ()
+game :: StateT GameState IO ()
 game = do
   playerGuess <- liftIO $ askPlayerForNumber "\nYour guess"
   computerGuess <- getComputerGuess 10
   liftIO . putStrLn $ "Computer guess: " ++ show computerGuess
   playerFingers <- liftIO $ askPlayerForNumber "How many fingers? "
   computerFingers <- getComputerGuess 5
+  liftIO . putStrLn $ "Computer showed " ++ show computerFingers ++ " fingers."
   let totalFingers = playerFingers + computerFingers
-  scores <- get
-  newScores <-
-    if totalFingers == playerGuess then do
-      liftIO $ putStrLn "Your guess was right!"
-      return $ Scores (player scores + 1) (computer scores)
-    else if totalFingers == computerGuess then do
-      liftIO $ putStrLn "Computer guess was right, sorry."
-      return $ Scores (player scores) (computer scores + 1)
-    else do
-      liftIO $ putStrLn "Nobody guessed."
-      return scores
+  liftIO . putStrLn $ "Total fingers = " ++ show totalFingers
+  state <- get
+  let oldScores = scores state
 
-  put newScores
-  liftIO . putStrLn $ "Current score: " ++ show newScores
+  newScores <- liftIO $
+    if totalFingers == playerFingers
+       && totalFingers == computerFingers then do
+      putStrLn "Both guess right!"
+      return $ Scores (player oldScores + 1) (computer oldScores + 1)
+    else if totalFingers == playerGuess then do
+      putStrLn "Your guess was right!"
+      return $ oldScores { player = player oldScores + 1 }
+    else if totalFingers == computerGuess then do
+      putStrLn "Computer guess was right, sorry."
+      return $ oldScores { computer = computer oldScores + 1 }
+    else do
+      putStrLn "Nobody guessed."
+      return oldScores
+
+  let newState = GameState newScores (playerGuess : allPlayerGuesses state)
+  liftIO . putStrLn $ "Current state: " ++ show newState
+  put newState
 
   if player newScores == 3 then
     liftIO $ putStrLn "You win!"
@@ -49,5 +68,5 @@ game = do
 
 main :: IO ()
 main = do
-  (_, scores) <- runStateT game (Scores 0 0)
-  print scores
+  (_, s) <- runStateT game (GameState (Scores 0 0) [])
+  print . scores $ s
