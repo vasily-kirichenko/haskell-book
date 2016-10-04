@@ -2,6 +2,7 @@
 
 module ScottyEx where
 
+import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Reader
 import           Data.IORef
@@ -9,7 +10,6 @@ import qualified Data.Map                   as M
 import           Data.Maybe                 (fromMaybe)
 import           Data.Text.Lazy             (Text)
 import qualified Data.Text.Lazy             as TL
-import           Network.Wreq               (Response)
 import           System.Environment         (getArgs)
 import           Web.Scotty.Trans
 
@@ -33,10 +33,13 @@ bumpBoomp k m =
 app :: Scotty ()
 app =
   get "/:key" $ do
+    config <- (lift . ReaderT) return
     unprefixed <- param "key"
     let key' :: String
-        key' = mappend undefined unprefixed
-    newInteger <- undefined
+        key' = mappend (TL.unpack . prefix $ config) unprefixed
+    m <- liftIO . readIORef . count $ config
+    let (m', newInteger) = bumpBoomp (TL.pack key') m
+    liftIO (writeIORef (count config) m')
     html $ mconcat [ "<h1>Success! Count was: "
                    , TL.pack $ show newInteger
                    , "</h1>"
@@ -50,6 +53,6 @@ main = do
         Config {
           count = counter
         , prefix = TL.pack prefixArg }
-      runR :: ReaderT Config IO Response -> IO Response
-      runR = ReaderT . const
+      runR :: ReaderT Config IO r -> IO r
+      runR rt = runReaderT rt config
   scottyT 3000 runR app
