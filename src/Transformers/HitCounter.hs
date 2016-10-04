@@ -33,7 +33,7 @@ bumpBoomp k m =
 app :: Scotty ()
 app =
   get "/:key" $ do
-    config <- (lift . ReaderT) return
+    config <- lift ask
     unprefixed <- param "key"
     let key' :: String
         key' = mappend (TL.unpack . prefix $ config) unprefixed
