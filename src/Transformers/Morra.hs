@@ -1,3 +1,7 @@
+{-# LANGUAGE MultiWayIf      #-}
+{-# LANGUAGE NamedFieldPuns  #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module Morra where
 
 import           Control.Monad.IO.Class
@@ -6,6 +10,9 @@ import           Control.Monad.Trans.State
 import qualified Data.List                 as L
 import           Data.Maybe                (fromMaybe)
 import           System.Random
+
+type Guess = Int
+type Fingers = Int
 
 data Scores =
   Scores {
@@ -16,89 +23,85 @@ data Scores =
 data GameState =
   GameState {
     scores           :: Scores
-  , allPlayerGuesses :: [Int]
+  , allPlayerGuesses :: [Guess]
 } deriving Show
 
-getPreviousPlayerGuess :: [Int] -> Maybe Int
+getPreviousPlayerGuess :: [Guess] -> Maybe Guess
 getPreviousPlayerGuess guesses =
-  case reverse . fst . L.splitAt 2 $ guesses of
-    [x, y] ->
-      let guesses' = reverse . drop 1 $ guesses in
-      do i <- L.elemIndex x guesses'
-         case drop i guesses' of
-           _ : y' : z : _
-            | y == y' -> Just z
-            | otherwise -> Nothing
-           _ -> Nothing
-    _ -> Nothing
+  go pat guesses'
+  where
+    pat = reverse . take 2 $ guesses
+    guesses' = reverse . drop 1 $ guesses
+    go [x, y] (x':rest@(y':z:_))
+      | x == x' && y == y' = Just z
+      | otherwise = go pat (L.dropWhile (/=x) rest)
+    go _ _ = Nothing
 
-getComputerGuess :: Int -> StateT GameState IO Int
-getComputerGuess maxNumber = do
+getComputerGuess :: StateT GameState IO Guess
+getComputerGuess = do
   playerGuesses <- allPlayerGuesses <$> get
   case getPreviousPlayerGuess playerGuesses of
     Just guess -> return guess
-    Nothing -> liftIO $ randomRIO (0, maxNumber)
+    Nothing -> liftIO $ randomRIO (0, 10)
 
-getComputerFingers :: IO Int
+getComputerFingers :: IO Fingers
 getComputerFingers = randomRIO (0, 5)
 
-askPlayerForGuess :: StateT GameState IO Int
+askPlayerForGuess :: StateT GameState IO Guess
 askPlayerForGuess = do
    liftIO $ putStr "\nYour guess: "
-   guess <- liftIO (readLn :: IO Int)
-   state <- get
-   put $ state { allPlayerGuesses = guess : allPlayerGuesses state }
+   guess <- liftIO readLn
+   state @ GameState { allPlayerGuesses } <- get
+   put $ state { allPlayerGuesses = guess : allPlayerGuesses }
    return guess
 
-askPlayerForNumber :: String -> IO Int
-askPlayerForNumber caption =
-  putStr (caption ++ ": ") >> readLn :: IO Int
+askPlayerForFingers :: IO Fingers
+askPlayerForFingers = putStr "How many fingers? : " >> readLn :: IO Fingers
 
 writeln :: MonadIO m => String -> StateT a m ()
 writeln = liftIO . putStrLn
 
-game :: StateT GameState IO ()
-game = do
+gameLoop :: StateT GameState IO ()
+gameLoop = do
   playerGuess <- askPlayerForGuess
 
-  computerGuess <- getComputerGuess 10
+  computerGuess <- getComputerGuess
   writeln $ "Computer guess: " ++ show computerGuess
 
-  playerFingers <- liftIO $ askPlayerForNumber "How many fingers? "
+  playerFingers <- liftIO askPlayerForFingers
 
-  computerFingers <- getComputerGuess 5
+  computerFingers <- liftIO getComputerFingers
   writeln $ "Computer showed " ++ show computerFingers ++ " fingers."
 
   let totalFingers = playerFingers + computerFingers
   writeln $ "Total fingers = " ++ show totalFingers
 
-  state <- get
-  let oldScores = scores state
+  state @ GameState { scores = scores @ Scores {..} } <- get
 
   newScores <-
-    if totalFingers == playerFingers && totalFingers == computerFingers then do
-      writeln "Both guess right!"
-      return $ Scores (player oldScores + 1) (computer oldScores + 1)
-    else if totalFingers == playerGuess then do
-      writeln "Your guess was right!"
-      return $ oldScores { player = player oldScores + 1 }
-    else if totalFingers == computerGuess then do
-      writeln "Computer guess was right, sorry."
-      return $ oldScores { computer = computer oldScores + 1 }
-    else do
-      writeln "Nobody guessed."
-      return oldScores
+    if | totalFingers == playerFingers && totalFingers == computerFingers -> do
+           writeln "Both guess right!"
+           return $ Scores (player + 1) (computer + 1)
+       | totalFingers == playerGuess -> do
+           writeln "Your guess was right!"
+           return $ scores { player = player + 1 }
+       | totalFingers == computerGuess -> do
+           writeln "Computer guess was right, sorry."
+           return $ scores { computer = computer + 1 }
+       | otherwise -> do
+           writeln "Nobody guessed."
+           return scores
 
   let newState = state { scores = newScores }
   writeln $ "Current state: " ++ show newState
   put newState
 
-  case (player newScores, computer newScores) of
-    (3, _) -> writeln "You win!"
-    (_, 3) -> writeln "Computer wins, sorry."
-    _ -> game
+  case newScores of
+    Scores { player = 3 } -> writeln "You win!"
+    Scores { computer = 3 } -> writeln "Computer wins, sorry."
+    _ -> gameLoop
 
 main :: IO ()
 main = do
-  (_, s) <- runStateT game (GameState (Scores 0 0) [])
+  (_, s) <- runStateT gameLoop (GameState (Scores 0 0) [])
   print . scores $ s

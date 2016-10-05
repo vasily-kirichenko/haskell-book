@@ -1,3 +1,5 @@
+{-# LANGUAGE NPlusKPatterns #-}
+
 module Transformers where
 
 
@@ -120,3 +122,7 @@ instance MonadIO m => MonadIO (ReaderT r m) where
 
 instance MonadIO m => MonadIO (StateT s m) where
   liftIO = lift . liftIO
+
+foo :: Int -> Int
+foo (n + 10) = n
+foo n = n
