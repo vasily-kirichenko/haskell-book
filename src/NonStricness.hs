@@ -50,3 +50,7 @@ twoEls = Cons 1 (Cons undefined Nil)
 oneEl = sTake 1 twoEls
 threeElements = Cons 2 twoEls
 oneElT = sTake 1 threeElements
+
+t = undefined
+u = "blah"
+main = print (snd (t, u))

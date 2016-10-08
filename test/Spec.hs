@@ -2,6 +2,7 @@ module Main where
 
 import qualified Data.Map        as M
 import           Morse
+import           Test.Hspec
 import           Test.QuickCheck
 
 allowedChars :: String
@@ -23,3 +24,8 @@ prop_thereAndBackAgain =
 
 main :: IO ()
 main = quickCheck prop_thereAndBackAgain
+
+testTwoPlusTwo =
+  describe "foo" $
+    it "2 + 2 should be 4" $
+      2 + 2 `shouldBe` 4
