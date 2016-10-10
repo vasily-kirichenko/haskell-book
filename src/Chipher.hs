@@ -32,3 +32,6 @@ encode k s =
           (ordPairs k s)
   in map chr shifted
   --in shifted
+
+main :: IO ()
+main = print $ encode "foo" "bar"

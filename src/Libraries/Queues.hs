@@ -6,24 +6,20 @@ module Queues where
 import           Criterion.Main
 
 data Queue a =
-  Queue
-    { enqueue :: [a]
-    , dequeue :: [a]
-    } deriving (Eq, Show)
+  Queue {
+    enqueue :: [a]
+  , dequeue :: [a]
+  } deriving (Eq, Show)
 
 push :: a -> Queue a -> Queue a
 push a q@Queue{enqueue} = q { enqueue = a : enqueue }
 
 pop :: Queue a -> Maybe (a, Queue a)
-pop q@Queue{..} =
-  case dequeue of
-    x:xs -> Just (x, q { dequeue = xs })
-    [] ->
-      case enqueue of
-        [] -> Nothing
-        xs ->
-          let (x:xs) = reverse xs
-          in Just (x, q { dequeue = xs, enqueue = [] })
+pop (Queue [] []) = Nothing
+pop (Queue e (x:xs)) = Just (x, Queue e xs)
+pop (Queue xs []) =
+  let (h:t) = reverse xs
+  in Just (h, Queue [] t)
 
 planeList :: Int -> [Int]
 planeList n = go [1..n]
@@ -45,4 +41,5 @@ queue n = de (en n $ Queue [] [])
 main :: IO ()
 main = defaultMain
   [ bench "list" $ whnf planeList 1000
-  , bench "queue" $ whnf queue 1000 ]
+  , bench "queue" $ whnf queue 1000
+  ]
