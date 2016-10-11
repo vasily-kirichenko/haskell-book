@@ -44,6 +44,7 @@ library
   ghc-options:         -fwarn-incomplete-patterns
                        -fwarn-incomplete-uni-patterns
                        -fwarn-incomplete-record-updates
+                       -Wall
 
 executable haskell-book-exe
   hs-source-dirs:      app

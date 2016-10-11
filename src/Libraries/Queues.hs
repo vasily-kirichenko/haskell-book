@@ -1,5 +1,4 @@
-{-# LANGUAGE NamedFieldPuns  #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Queues where
 
@@ -12,31 +11,31 @@ data Queue a =
   } deriving (Eq, Show)
 
 push :: a -> Queue a -> Queue a
-push a q@Queue{enqueue} = q { enqueue = a : enqueue }
+push a (Queue e d) = Queue (a:e) d
 
 pop :: Queue a -> Maybe (a, Queue a)
-pop (Queue [] []) = Nothing
 pop (Queue e (x:xs)) = Just (x, Queue e xs)
-pop (Queue xs []) =
-  let (h:t) = reverse xs
-  in Just (h, Queue [] t)
+pop (Queue e []) =
+  case reverse e of
+    [] -> Nothing
+    h:t -> Just (h, Queue [] t)
 
 planeList :: Int -> [Int]
 planeList n = go [1..n]
   where go [] = []
         go xs = go . removeLast [] $ xs
         removeLast _ [] = []
-        removeLast acc [x] = acc
+        removeLast acc [_] = acc
         removeLast acc (x:xs) = removeLast (x:acc) xs
 
 queue :: Int -> [Int]
-queue n = de (en n $ Queue [] [])
-  where en 0 q = q
-        en n q = en (n-1) (push n q)
-        de q =
+queue n = dequeue . enqueue n $ Queue [] []
+  where enqueue 0 q = q
+        enqueue n' q = enqueue (n'-1) (push n' q)
+        dequeue q =
           case pop q of
             Nothing -> []
-            Just (_, q) -> de q
+            Just (_, queue') -> dequeue queue'
 
 main :: IO ()
 main = defaultMain
